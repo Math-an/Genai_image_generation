@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Futuristic Text-to-Image Generator</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    .spin {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .fade-in {
+      animation: fadeIn 0.8s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+
+  <div class="text-center space-y-6 max-w-lg mx-auto p-6 bg-gray-800 shadow-lg rounded-lg">
+    <h1 class="text-3xl font-bold text-cyan-500">Text-to-Image Generator</h1>
+    <p class="text-gray-400">Enter a prompt and generate an AI image with a futuristic twist.</p>
+
+    <input 
+      type="text" 
+      id="prompt" 
+      placeholder="Describe your image here..." 
+      class="w-full px-4 py-2 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+    />
+
+    <div class="flex justify-between items-center mt-4">
+      <label for="numImages" class="text-gray-400">Number of Images (1 to 10):</label>
+      <input 
+        type="number" 
+        id="numImages" 
+        min="1" 
+        max="10" 
+        value="1" 
+        class="w-20 px-2 py-1 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+      />
+    </div>
+
+    <div class="mt-4">
+      <label for="quality" class="text-gray-400">Image Quality (25 to 50):</label>
+      <input 
+        type="range" 
+        id="quality" 
+        min="25" 
+        max="50" 
+        value="35" 
+        class="w-full"
+      />
+      <p class="text-xs text-gray-400 mt-1">Higher quality may slow down generation.</p>
+    </div>
+
+    <div class="mt-4">
+      <label for="accuracy" class="text-gray-400">Accuracy (Guidance Scale 1.0 to 10.0):</label>
+      <input 
+        type="range" 
+        id="accuracy" 
+        min="1.0" 
+        max="10.0" 
+        step="0.1" 
+        value="4.5" 
+        class="w-full"
+      />
+    </div>
+
+    <button 
+      onclick="generateImages()" 
+      class="w-full py-2 px-4 bg-white text-black rounded-lg font-semibold mt-4"
+    >
+      Generate Images
+    </button>
+
+    <div id="loading" class="mt-4 hidden">
+      <svg class="w-12 h-12 text-cyan-500 mx-auto spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <circle cx="12" cy="12" r="10" stroke-width="4"></circle>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2"></path>
+      </svg>
+      <p class="text-cyan-400">Generating your images...</p>
+    </div>
+
+    <div id="imageContainer" class="mt-4 hidden fade-in grid grid-cols-2 gap-4">
+      <!-- Generated images will appear here -->
+    </div>
+  </div>
+
+  <script>
+    let socket;
+
+    function generateImages() {
+        const prompt = document.getElementById('prompt').value;
+        const numImages = parseInt(document.getElementById('numImages').value);
+        const quality = parseInt(document.getElementById('quality').value);
+        const accuracy = parseFloat(document.getElementById('accuracy').value);
+
+        // WebSocket URL (Make sure it's correct!)
+        const wsUrl = "wss://8564-34-125-228-232.ngrok-free.app/ws"; 
+
+        // Close existing WebSocket connection if open
+        if (socket) {
+            socket.close();
+        }
+
+        // Show loading spinner
+        document.getElementById("loading").classList.remove("hidden");
+        document.getElementById("imageContainer").classList.add("hidden");
+
+        // Establish WebSocket connection
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = function () {
+            console.log("WebSocket connection established.");
+            // Send the request to generate images
+            socket.send(JSON.stringify({
+                prompt, 
+                num_images: numImages, 
+                quality, 
+                accuracy
+            }));
+        };
+
+        socket.onmessage = function (event) {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.images) {
+                    // Hide loading spinner
+                    document.getElementById("loading").classList.add("hidden");
+
+                    // Clear previous images
+                    const imageContainer = document.getElementById("imageContainer");
+                    imageContainer.innerHTML = "";
+
+                    // Display the generated images
+                    data.images.forEach((imageData, index) => {
+                        const img = document.createElement("img");
+                        img.src = `data:image/png;base64,${imageData}`;
+                        img.alt = `Generated Image ${index + 1}`;
+                        img.className = "w-full rounded-lg shadow-lg";
+                        imageContainer.appendChild(img);
+                    });
+
+                    // Show image container
+                    document.getElementById("imageContainer").classList.remove("hidden");
+                }
+            } catch (error) {
+                console.error("Error processing WebSocket message:", error);
+                alert("An error occurred while processing the images.");
+            }
+        };
+
+        socket.onerror = function (error) {
+            console.error("WebSocket Error:", error);
+            alert("WebSocket connection failed! Check server connection.");
+            document.getElementById("loading").classList.add("hidden");
+        };
+
+        socket.onclose = function () {
+            console.log("WebSocket connection closed.");
+        };
+    }
+  </script>
+
+</body>
+</html>
